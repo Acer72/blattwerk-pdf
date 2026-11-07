@@ -1,0 +1,56 @@
+name: Windows-EXE bauen
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Abhaengigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+      - name: EXE bauen
+        run: pyinstaller --noconfirm --onefile --windowed --name "Blattwerk PDF" blattwerk.py
+      - name: Starttest
+        shell: pwsh
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $p = Start-Process -FilePath "dist\Blattwerk PDF.exe" -PassThru
+          Start-Sleep -Seconds 20
+          if ($p.HasExited) { Write-Error "EXE hat sich sofort beendet (Code $($p.ExitCode))"; exit 1 }
+          Stop-Process -Id $p.Id -Force
+          Write-Host "EXE laeuft."
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Blattwerk-PDF-Windows-EXE
+          path: dist/Blattwerk PDF.exe
+      - name: Download-Seite (Release) anlegen
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Blattwerk PDF ${{ github.ref_name }}
+          files: dist/Blattwerk PDF.exe
+          body: |
+            ## Blattwerk PDF für Windows
+
+            **Herunterladen:** unten unter „Assets“ auf **Blattwerk.PDF.exe** klicken.
+
+            1. Die heruntergeladene Datei doppelklicken – keine Installation nötig.
+            2. Falls Windows warnt („Der Computer wurde durch Windows geschützt“):
+               **Weitere Informationen → Trotzdem ausführen**.
+            3. Der erste Start dauert ein paar Sekunden.
+
+            PDFs ansehen, markieren, kommentieren, Text einfügen und ändern, unterschreiben,
+            Formulare ausfüllen, Seiten drehen/löschen/sortieren/zusammenführen.
